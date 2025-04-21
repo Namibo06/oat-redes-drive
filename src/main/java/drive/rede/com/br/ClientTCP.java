@@ -17,10 +17,10 @@ public class ClientTCP {
              Scanner scanner = new Scanner(System.in)) {
 
 
-            System.out.println(input.readUTF()); // "Digite o usuário:"
+            System.out.println(input.readUTF());
             output.writeUTF(scanner.nextLine());
 
-            System.out.println(input.readUTF()); // "Digite a senha:"
+            System.out.println(input.readUTF());
             output.writeUTF(scanner.nextLine());
 
             String response = input.readUTF();
@@ -92,7 +92,7 @@ public class ClientTCP {
 
         output.writeUTF(file.getName());
         output.writeLong(file.length());
-        output.flush(); // Adicione este flush para garantir que os metadados sejam enviados
+        output.flush();
 
         try (FileInputStream fis = new FileInputStream(file)) {
             byte[] buffer = new byte[4096];
@@ -100,32 +100,40 @@ public class ClientTCP {
             while ((bytesRead = fis.read(buffer)) != -1) {
                 output.write(buffer, 0, bytesRead);
             }
-            output.flush(); // Flush final para garantir que todos os dados sejam enviados
+            output.flush();
         }
 
-        System.out.println(input.readUTF()); // UPLOAD_COMPLETED
-        System.out.println(input.readUTF()); // READY
+        System.out.println(input.readUTF());
+        System.out.println(input.readUTF());
     }
 
     private static void downloadFile(DataOutputStream output, DataInputStream input, Scanner scanner) throws IOException {
         System.out.println("Digite o nome do arquivo para download:");
         String fileName = scanner.nextLine();
         output.writeUTF(fileName);
+        output.flush();
 
         String serverResponse = input.readUTF();
-        if (serverResponse.equals("Erro: Arquivo não encontrado")) {
+        if (serverResponse.startsWith("Erro:")) {
             System.out.println(serverResponse);
             return;
         }
 
+        // Se chegou aqui, o arquivo existe
+        long fileSize = input.readLong();
         File file = new File("downloads/" + fileName);
         file.getParentFile().mkdirs();
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            String line;
-            while (!(line = input.readUTF()).equals("EOF")) {
-                writer.write(line);
-                writer.newLine();
+        try (FileOutputStream fos = new FileOutputStream(file);
+             BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+
+            byte[] buffer = new byte[4096];
+            long received = 0;
+            int bytesRead;
+            while (received < fileSize &&
+                    (bytesRead = input.read(buffer, 0, (int)Math.min(buffer.length, fileSize - received))) != -1) {
+                bos.write(buffer, 0, bytesRead);
+                received += bytesRead;
             }
         }
 

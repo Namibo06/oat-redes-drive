@@ -142,25 +142,27 @@ public class Server {
 
             output.writeUTF("UPLOAD_COMPLETED");
             output.writeUTF("READY");
-            output.flush(); // Adicione este flush
+            output.flush();
             System.out.println("Arquivo salvo em: " + filePath);
         }
 
         private void sendFile(DataOutputStream output, DataInputStream input) throws IOException {
-            output.writeUTF("Digite o nome do arquivo para download:");
-            String fileName = input.readUTF();
+            String fileName = input.readUTF(); // Já recebemos o nome do arquivo antes
             String fileType = getFileExtension(fileName);
             Path filePath = Paths.get(STORAGE_DIR, username, fileType, fileName);
 
             if (Files.exists(filePath)) {
-                output.writeUTF("Iniciando download...");
-                try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        output.writeUTF(line);
+                output.writeUTF("Arquivo encontrado. Iniciando download...");
+                output.writeLong(Files.size(filePath)); // Envia o tamanho do arquivo primeiro
+
+                try (InputStream fileInput = Files.newInputStream(filePath)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = fileInput.read(buffer)) != -1) {
+                        output.write(buffer, 0, bytesRead);
                     }
+                    output.flush();
                 }
-                output.writeUTF("EOF");
             } else {
                 output.writeUTF("Erro: Arquivo não encontrado");
             }
